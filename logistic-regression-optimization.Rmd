@@ -1,0 +1,298 @@
+---
+title: "Project 141c -- Shared"
+author: "Jeff Anderson"
+date: "3/12/2023"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+
+functions = list.files('functions', full.names = TRUE)
+functions
+```
+
+```{r}
+sapply(functions, source)
+```
+
+
+
+
+```{r}
+temp = sim_data(n = 10000)
+
+X_sim = temp[[1]]
+
+y_sim = temp[[2]]
+
+
+temp2 = read.csv('heartdata.csv')
+
+
+X_heart = temp2[,1:14] 
+y_heart = temp2[,15]
+
+
+```
+
+
+```{r}
+
+
+testtrainsep = function(A,b){
+  
+  n = nrow(X_sim)
+  
+  c = n%/%(4/3)
+  
+  X_train = A[1:c,]
+  y_train = b[1:c]
+    
+  X_test = A[(c+1):n,]
+  y_test = b[(c+1):n]
+  
+  traintest = list(X_train = X_train, y_train = y_train,
+                   X_test = X_test, y_test  = y_test)
+  
+  return(traintest)
+}
+
+```
+
+
+```{r}
+data1 = testtrainsep(X_sim, y_sim)
+
+X_sim_train = data1$X_train
+y_sim_train = data1$y_train
+
+X_sim_test = data1$X_test
+y_sim_test = data1$y_test
+
+```
+
+
+
+### Batch Gradient Descent
+
+```{r}
+test1 = log_regr(X_sim_train, y_sim_train, a = 0.1)
+```
+
+
+```{r}
+
+conf_matrix(test1[[1]], X_sim_test, y_sim_test)
+
+```
+
+
+
+
+### On-Line Stochastic Gradient Descent
+
+
+
+```{r}
+
+test2 = log_regr_stoch2(X_sim_train, y_sim_train, a = 0.0001, tol = 0.000001)
+
+
+```
+
+```{r}
+
+conf_matrix(test2[[1]], X_sim_test, y_sim_test)
+
+
+
+```
+
+
+### On-Line Stochastic Gradient Descent with Momentum
+
+```{r}
+
+test3 = log_regr_stoch_mom(X_sim_train, y_sim_train, nu = 0.0001, alpha = 0.3)
+
+
+
+```
+
+
+```{r}
+
+
+conf_matrix(test3[[1]], X_sim_test, y_sim_test)
+
+
+
+```
+
+
+
+### Mini-Batch Stochastic Gradient Descent, m = 4
+```{r}
+
+
+
+test4 = log_regr_minibatch(X_sim_train, y_sim_train, batch_size = 4, a = 0.001)
+
+
+```
+
+
+```{R}
+
+conf_matrix(test4[[1]], X_sim_test, y_sim_test)
+
+
+```
+
+
+### Newtons Method
+
+
+```{R}
+z = newtons_method_chol(X_sim_train, y_sim_train, rep(0,10), m = 7500, iter_n = 4)
+```
+
+```{r}
+
+conf_matrix(z[[1]], X_sim_test, y_sim_test)
+
+```
+
+
+### Timings: Batch, On-Line, On-Line with Momentum
+
+Run at own risk (batch takes forever)
+```{r}
+# 
+# sgd_timings = microbenchmark::microbenchmark(
+#   log_regr(X_sim_train, y_sim_train, a = 0.1),
+#   log_regr_stoch2(X_sim_train, y_sim_train, a = 0.0001, tol = 0.000001),
+#   log_regr_stoch_mom(X_sim_train, y_sim_train, nu = 0.0001, alpha = 0.3)
+#   
+# )
+# 
+
+```
+
+
+
+Table and Violin Plots for Timings above
+```{r}
+
+# sgd_timings
+# 
+# ggplot2::autoplot(sgd_timings)
+# 
+
+```
+
+
+### Timings
+```{r}
+
+sgd_timings2 = microbenchmark::microbenchmark(
+  log_regr_stoch2(X_sim_train, y_sim_train, a = 0.001, tol = 0.0001),
+  log_regr_stoch_mom(X_sim_train, y_sim_train, nu = 0.0001, alpha = 0.3),
+  log_regr_minibatch(X_sim_train, y_sim_train, batch_size = 4, a = 0.001),
+  newtons_method_chol(X_sim_train, y_sim_train, W = rep(0,10), m = 7500, iter_n = 4)
+  
+  
+  
+)
+
+
+```
+
+
+```{r}
+library(ggplot2)
+sgd_timings2
+
+xlabs = c('On-Line SGD', 'On-Line SGD with Momentum', 'Minibatch, m = 4', 'Newtons Method')
+
+ggplot2::autoplot(sgd_timings2) + scale_x_discrete(labels = xlabs) + ggtitle('Time Anlalysis for Different Algorithms') + theme(plot.title = element_text(hjust = 0.5))
+```
+
+```{r}
+
+batch_timings = microbenchmark::microbenchmark(
+  log_regr_stoch2(X_sim_train,y_sim_train),
+  log_regr_minibatch_cost(X_sim_train, y_sim_train, batch_size = 1),
+  log_regr_minibatch_cost(X_sim_train, y_sim_train, batch_size = 2),
+  log_regr_minibatch_cost(X_sim_train, y_sim_train, batch_size = 4),
+  log_regr_minibatch_cost(X_sim_train, y_sim_train, batch_size = 8),
+  log_regr_minibatch_cost(X_sim_train, y_sim_train, batch_size = 16),
+  log_regr_minibatch_cost(X_sim_train, y_sim_train, batch_size = 32),
+  log_regr_minibatch_cost(X_sim_train, y_sim_train, batch_size = 64),
+  log_regr_minibatch_cost(X_sim_train, y_sim_train, batch_size = 128)#,
+  #log_regr_minibatch_cost(X_sim_train, y_sim_train, batch_size = 256),
+)
+
+
+
+
+
+
+```
+
+
+```{r}
+
+library(ggplot2)
+
+
+batch_timings
+
+labels = c('Base: On-Line SGD','m = 1','m = 2','m = 4','m = 8','m = 16','m = 32', 'm = 64', 'm = 128', 'm = 256')
+autoplot(batch_timings) + scale_x_discrete(labels = labels) +ggtitle('Time Anlalysis for Variable Batch Size') + theme(plot.title = element_text(hjust = 0.5))
+
+
+```
+
+```{r}
+
+
+# Set the layout of the plot
+par(mfrow = c(2, 2))
+
+# Create 8 plots and add them to the grid
+for (i in 1:8) {
+  
+  mb4_cost = log_regr_minibatch_cost(X_sim_train, y_sim_train, a = 0.001, batch_size = 2^i)
+
+  mb4_cost = mb4_cost[[5]]
+
+  mb4_cost = mb4_cost[mb4_cost != 0]
+
+  plot(1:length(mb4_cost), mb4_cost, 'l', main = paste0("Batch size of ", 2^i), xlab="Iteration Number", ylab = "cost", ylim = c(0, 0.9))
+  
+  
+}
+
+# Reset the layout to default
+par(mfrow = c(2, 2))
+
+
+# mb4_avg = ifelse(is.na(mb4_cost), 0, mb4_cost)
+# 
+# mb4_avg = split(mb4_avg, 1:5000)
+# 
+# 
+# mb4_avg = sapply(mb4_avg, mean)
+```
+
+
+```{r}
+plot(1:length(mb4_cost), mb4_cost, 'l')
+```
+
+
